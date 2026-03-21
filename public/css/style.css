@@ -1,0 +1,71 @@
+[x-cloak] { display: none !important; }
+:root {
+    --primary: #22c55e;
+    --primary-dark: #16a34a;
+    --bg-dark: #09090b;
+}
+body {
+    background-color: var(--bg-dark);
+    background-image: 
+        radial-gradient(at 0% 0%, rgba(34, 197, 94, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(34, 197, 94, 0.1) 0px, transparent 50%);
+    color: #fafafa;
+    font-family: 'Plus Jakarta Sans', 'Tajawal', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+.glass {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+.glass-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.glass-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(34, 197, 94, 0.3);
+    transform: translateY(-2px);
+}
+.btn-glow {
+    background: linear-gradient(135deg, #22c55e 0%, #15803d 100%);
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.2);
+    transition: all 0.3s ease;
+}
+.btn-glow:hover {
+    box-shadow: 0 0 30px rgba(34, 197, 94, 0.4);
+    transform: scale(1.02);
+}
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    position: relative;
+}
+.status-online { background: #22c55e; box-shadow: 0 0 12px #22c55e; }
+.status-offline { background: #ef4444; box-shadow: 0 0 12px #ef4444; }
+
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+
+/* Animations */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.animate-fade-in { animation: fadeIn 0.5s ease forwards; }
+.z-modal { z-index: 9999 !important; }
+
+/* Force English Numbers (Latin Numerals) for inputs and critical data */
+input, select, .font-mono, [dir="rtl"] input, [dir="rtl"] select {
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    unicode-range: U+0030-0039; /* Only force digits 0-9 */
+}
+
+/* Alternative approach for Arabic context */
+[dir="rtl"] .font-mono {
+    direction: ltr;
+    text-align: right;
+}

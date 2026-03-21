@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft AFK | Premium Dashboard</title>
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body x-data="botApp" class="p-4 md:p-8 antialiased">
+
+    <div class="max-w-7xl mx-auto" x-cloak>
+        
+        <!-- Header Section -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-12 gap-6 animate-fade-in">
+            <div class="flex items-center gap-5">
+                <div class="w-14 h-14 rounded-2xl glass flex items-center justify-center border-green-500/30">
+                    <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight" x-text="t('title')"></h1>
+                    <div class="flex items-center gap-2 mt-1">
+                        <div :class="backendConnected ? 'status-online' : 'status-offline'" class="status-dot"></div>
+                        <span class="text-xs font-medium text-gray-400" x-text="backendConnected ? t('connected') : t('disconnected')"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <!-- Language Toggle -->
+                <button @click="toggleLang()" class="glass px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-white/10 transition-all border-white/10 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path>
+                    </svg>
+                    <span x-text="lang === 'ar' ? 'English' : 'العربية'"></span>
+                </button>
+                
+                <!-- Add Bot Button -->
+                <button @click="openAddBotModal()" class="btn-glow px-6 py-3 rounded-xl text-sm font-bold flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    <span x-text="t('addBot')"></span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Dashboard Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-in" style="animation-delay: 0.1s">
+            
+            <!-- Left Panel -->
+            <div class="lg:col-span-4 space-y-6">
+                <div class="glass p-6 rounded-3xl">
+                    <h3 class="text-sm font-bold text-gray-500 uppercase tracking-widest mb-6 px-1" x-text="t('botsList')"></h3>
+                    <div class="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                        <template x-for="bot in bots" :key="bot.id">
+                            <div @click="selectBot(bot)" 
+                                 class="glass-card p-4 rounded-2xl cursor-pointer relative overflow-hidden group"
+                                 :class="selectedBot && selectedBot.id === bot.id ? 'bg-green-500/10 border-green-500/30 ring-1 ring-green-500/20' : ''">
+                                <div class="flex items-center justify-between relative z-10">
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-12 h-12 rounded-xl bg-zinc-900 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform" 
+                                             x-text="bot.type === 'bedrock' ? '📱' : '💻'"></div>
+                                        <div>
+                                            <div class="flex items-center gap-2">
+                                                <p class="font-bold text-white group-hover:text-green-400 transition-colors" x-text="bot.username"></p>
+                                                <span class="text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-gray-400 font-mono" x-text="bot.version"></span>
+                                            </div>
+                                            <div class="flex items-center gap-2 mt-0.5">
+                                                <span :class="bot.type === 'bedrock' ? 'text-blue-400' : 'text-green-400'" 
+                                                      class="text-[9px] font-bold uppercase tracking-wider" 
+                                                      x-text="bot.type === 'bedrock' ? 'Bedrock' : 'Java'"></span>
+                                                <span class="text-[9px] text-gray-600 font-mono" x-text="bot.host"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div :class="bot.status === 'online' ? 'status-online' : 'status-offline'" class="status-dot"></div>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="bots.length === 0" class="text-center py-12 text-gray-600 italic px-4" x-text="t('noBots')"></div>
+                    </div>
+                </div>
+
+                <!-- Bot Control Center -->
+                <div class="glass p-8 rounded-3xl" x-show="selectedBot" x-transition>
+                    <h3 class="text-sm font-bold text-gray-500 uppercase tracking-widest mb-8" x-text="t('controlCenter')"></h3>
+                    <div class="grid grid-cols-2 gap-4 mb-8">
+                        <div class="bg-zinc-900/50 p-5 rounded-2xl border border-white/5 text-center flex flex-col justify-center">
+                            <p class="text-[10px] font-bold text-gray-500 uppercase mb-2" x-text="t('currentStatus')"></p>
+                            <p class="font-bold text-lg" :class="selectedBot.status === 'online' ? 'text-green-400' : 'text-red-400'" x-text="selectedBot.status === 'online' ? t('online') : t('offline')"></p>
+                        </div>
+                        <div class="bg-zinc-900/50 p-5 rounded-2xl border border-white/5 text-center flex flex-col justify-center">
+                            <p class="text-[10px] font-bold text-gray-500 uppercase mb-2" x-text="t('serverPort')"></p>
+                            <p class="font-bold text-lg text-white font-mono" x-text="selectedBot.port"></p>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        <button @click="toggleBot()" class="w-full py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-3 text-lg" :class="selectedBot.status === 'online' ? 'btn-danger' : 'btn-glow'">
+                            <span x-text="selectedBot.status === 'online' ? t('stopBot') : t('startBot')"></span>
+                        </button>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button @click="showConfig = true" class="glass-card py-3 rounded-2xl font-bold text-sm text-gray-300 hover:text-white" x-text="t('edit')"></button>
+                            <button @click="deleteBot()" class="glass-card py-3 rounded-2xl font-bold text-sm text-red-500/80 hover:bg-red-500/10" x-text="t('delete')"></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel -->
+            <div class="lg:col-span-8">
+                <div class="glass rounded-3xl h-full flex flex-col min-h-[600px] overflow-hidden">
+                    <div class="p-6 border-b border-white/5 flex items-center justify-between bg-white/2">
+                        <span class="text-sm font-bold text-gray-400 tracking-wide" x-text="t('liveTerminal')"></span>
+                        <div class="flex items-center gap-4">
+                            <span class="text-[10px] bg-white/5 px-3 py-1.5 rounded-lg text-gray-500 font-bold" x-text="logs.length + ' ' + t('entries')"></span>
+                            <button @click="logs = []" class="text-xs text-gray-500 hover:text-white transition-colors font-bold" x-text="t('clear')"></button>
+                        </div>
+                    </div>
+                    <div class="flex-1 p-6 terminal-bg font-mono text-sm overflow-y-auto space-y-3 custom-scrollbar" id="logs-container">
+                        <template x-for="log in logs" :key="log.time">
+                            <div class="flex gap-4 items-start">
+                                <span class="text-gray-600 shrink-0 text-[11px]" x-text="log.time"></span>
+                                <span class="text-green-400/90 leading-relaxed" x-text="log.msg"></span>
+                            </div>
+                        </template>
+                        <div x-show="logs.length === 0" class="h-full flex flex-col items-center justify-center text-gray-700 italic gap-4">
+                            <p x-text="t('waitingForLogs')"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showConfig" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl" x-cloak x-transition>
+        <div class="glass w-full max-w-lg p-10 rounded-[40px] shadow-2xl relative" @click.away="showConfig = false">
+            <h2 class="text-3xl font-bold text-white mb-10 text-center" x-text="editingBotId ? t('editBot') : t('addNewBot')"></h2>
+            <div class="space-y-8">
+                <!-- Server Type Toggle -->
+                <div class="flex gap-2 p-1.5 bg-white/5 rounded-2xl border border-white/5">
+                    <button @click="form.type = 'java'; updateType()" 
+                            :class="form.type === 'java' ? 'bg-green-500 text-white shadow-lg shadow-green-500/20' : 'text-gray-500 hover:text-white'"
+                            class="flex-1 py-3.5 rounded-xl font-bold transition-all text-xs flex items-center justify-center gap-2">
+                        <span x-show="form.type === 'java'">✅</span>
+                        <span x-text="t('javaEdition')"></span>
+                    </button>
+                    <button @click="form.type = 'bedrock'; updateType()" 
+                            :class="form.type === 'bedrock' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-gray-500 hover:text-white'"
+                            class="flex-1 py-3.5 rounded-xl font-bold transition-all text-xs flex items-center justify-center gap-2">
+                        <span x-show="form.type === 'bedrock'">✅</span>
+                        <span x-text="t('bedrockEdition')"></span>
+                    </button>
+                </div>
+
+                <div class="relative">
+                    <label class="absolute -top-2.5 left-4 px-2 bg-zinc-900 text-[10px] font-bold text-green-500 uppercase tracking-widest z-10" x-text="t('serverHost')"></label>
+                    <input type="text" x-model="form.host" placeholder="e.g. play.hypixel.net" class="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:outline-none focus:border-green-500 transition-all text-lg font-mono">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-6">
+                    <div class="relative">
+                        <label class="absolute -top-2.5 left-4 px-2 bg-zinc-900 text-[10px] font-bold text-blue-400 uppercase tracking-widest z-10" x-text="t('serverPort')"></label>
+                        <input type="number" x-model="form.port" class="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:outline-none focus:border-blue-400 transition-all text-lg font-mono">
+                    </div>
+                    <div class="relative">
+                        <label class="absolute -top-2.5 left-4 px-2 bg-zinc-900 text-[10px] font-bold text-green-500 uppercase tracking-widest z-10" x-text="t('botUsername')"></label>
+                        <input type="text" x-model="form.username" class="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:outline-none focus:border-green-500 transition-all text-lg font-mono">
+                    </div>
+                </div>
+                <!-- Version Selection -->
+                <div class="relative">
+                    <label class="absolute -top-2.5 left-4 px-2 bg-zinc-900 text-[10px] font-bold text-green-500 uppercase tracking-widest z-10" x-text="t('botVersion')"></label>
+                    <select x-model="form.version" class="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:outline-none focus:border-green-500 transition-all text-lg font-mono appearance-none">
+                        <template x-for="v in getCurrentVersions()" :key="v">
+                            <option :value="v" x-text="v" class="bg-zinc-900 text-white"></option>
+                        </template>
+                    </select>
+                    <div class="absolute inset-y-0 right-4 flex items-center pointer-events-none">
+                        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-4 mt-12">
+                <button @click="saveBot()" class="flex-1 btn-glow py-4 rounded-2xl font-bold text-white text-lg" x-text="t('saveCloud')"></button>
+                <button @click="showConfig = false" class="glass px-8 py-4 rounded-2xl font-bold text-gray-400 hover:text-white transition-all" x-text="t('cancel')"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="js/app.js"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</body>
+</html>
