@@ -175,8 +175,15 @@ document.addEventListener('alpine:init', () => {
                 });
                 this.socket.on('disconnect', () => { this.backendConnected = false; });
                 this.socket.on('botStatus', (data) => {
+                    console.log("Status update received:", data);
                     const bot = this.bots.find(b => b.id === data.id);
-                    if (bot) bot.status = data.status;
+                    if (bot) {
+                        bot.status = data.status;
+                        // Force UI update for selected bot
+                        if (this.selectedBot && this.selectedBot.id === data.id) {
+                            this.selectedBot.status = data.status;
+                        }
+                    }
                 });
                 this.socket.on('botLog', (data) => {
                     if (this.selectedBot && this.selectedBot.id === data.id) {
