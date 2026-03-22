@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const mineflayer = require('mineflayer');
 const bedrock = require('bedrock-protocol');
 const path = require('path');
+const axios = require('axios'); // Add axios for heartbeat
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
@@ -54,6 +55,17 @@ app.use(express.json());
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+// Render Heartbeat - Keep server alive
+const RENDER_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+setInterval(async () => {
+  try {
+    await axios.get(RENDER_URL);
+    console.log('[نبض] تم إرسال إشارة البقاء حياً للسيرفر.');
+  } catch (e) {
+    console.log('[تحذير] فشل إرسال إشارة البقاء حياً.');
+  }
+}, 5 * 60 * 1000); // Every 5 minutes
 
 // API: Get all bots
 app.get('/api/bots', (req, res) => {
@@ -107,34 +119,32 @@ function startBot(botData) {
   if (activeBots[id]) return;
 
   const isBedrock = type === 'bedrock';
-  console.log(`Starting ${isBedrock ? 'Bedrock' : 'Java'} bot ${username} on ${host}:${port}...`);
+  console.log(`[جاري البدء] تشغيل بوت ${isBedrock ? 'بيدروك' : 'جافا'} باسم ${username} على ${host}:${port}...`);
   
   try {
     if (isBedrock) {
-      // Bedrock Protocol Implementation
       const client = bedrock.createClient({
         host: host,
         port: parseInt(port),
         username: username,
         version: version,
         offline: true,
-        connectTimeout: 10000
+        connectTimeout: 15000
       });
 
       activeBots[id] = { bedrock: client };
       updateFirebaseBotStatus(id, 'online');
 
       client.on('spawn', () => {
-        io.emit('botStatus', { id, status: 'online', msg: 'Bedrock bot spawned!' });
-        io.emit('botLog', { id, msg: `[INFO] Bedrock bot ${username} joined successfully.` });
+        io.emit('botStatus', { id, status: 'online', msg: 'متصل الآن!' });
+        io.emit('botLog', { id, msg: `[نجاح] البوت ${username} دخل السيرفر بنجاح.` });
         
-        // Bedrock AFK - Simple packet rotation every 5s to avoid timeout
         activeBots[id].afkInterval = setInterval(() => {
           if (client.status === 'active') {
             client.queue('move_player', {
               runtime_id: client.entityId,
               position: client.position,
-              pitch: 0,
+              pitch: (Math.random() * 40) - 20,
               yaw: (Math.random() * 360),
               head_yaw: (Math.random() * 360),
               mode: 0,
@@ -148,67 +158,83 @@ function startBot(botData) {
 
       client.on('text', (packet) => {
         const msg = packet.message || packet.source_name + ": " + packet.message;
-        io.emit('botLog', { id, msg: `[CHAT] ${msg}` });
+        io.emit('botLog', { id, msg: `[دردشة] ${msg}` });
       });
 
       client.on('error', (err) => {
-        let errorMsg = err.message;
-        if (errorMsg.includes('version')) errorMsg = "Wrong Version / إصدار غير صحيح";
-        if (errorMsg.includes('refused')) errorMsg = "Server Refused / السيرفر رفض الاتصال";
+        let errorMsg = "خطأ في الاتصال";
+        if (err.message.includes('version')) errorMsg = "الإصدار المختار غير متوافق مع السيرفر";
+        if (err.message.includes('refused')) errorMsg = "السيرفر رفض الاتصال (تأكد أنه شغال)";
         
-        io.emit('botLog', { id, msg: `[ERROR] ${errorMsg}` });
+        io.emit('botLog', { id, msg: `[خطأ] ${errorMsg}` });
         io.emit('botStatus', { id, status: 'offline', msg: errorMsg });
         stopBot(id);
       });
 
       client.on('disconnect', (packet) => {
-        const reason = packet.reason || "Unknown / سبب غير معروف";
-        io.emit('botLog', { id, msg: `[DISCONNECTED] ${reason}` });
+        io.emit('botLog', { id, msg: `[انفصال] تم الخروج من السيرفر: ${packet.reason || 'سبب غير معروف'}` });
         stopBot(id);
       });
 
     } else {
-      // Existing Mineflayer Java Implementation
       const bot = mineflayer.createBot({
         host: host,
         port: parseInt(port),
         username: username,
         version: version || false,
-        auth: 'offline' // CRITICAL for Aternos/Cracked servers
+        auth: 'offline'
       });
 
       activeBots[id] = bot;
       updateFirebaseBotStatus(id, 'online');
 
       bot.on('login', () => {
-        io.emit('botStatus', { id, status: 'online', msg: 'Bot logged in!' });
+        // تحديث الحالة فوراً في الواجهة ليصبح الزر أحمر
+        io.emit('botStatus', { id, status: 'online', msg: 'متصل!' });
+        io.emit('botLog', { id, msg: `[نجاح] البوت ${username} سجل دخوله.` });
         console.log(`[SUCCESS] ${username} joined ${host}`);
         
-        let yaw = 0;
         bot.afkInterval = setInterval(() => {
           if (bot.entity) {
-            yaw += 0.2;
-            if (yaw > Math.PI * 2) yaw = 0;
-            bot.look(yaw, -0.5); 
+            const yaw = (Math.random() * Math.PI * 2);
+            const pitch = (Math.random() * 1.5) - 0.75;
+            bot.look(yaw, pitch);
+
+            const rand = Math.random();
+            if (rand > 0.8) {
+              bot.setControlState('jump', true);
+              setTimeout(() => bot.setControlState('jump', false), 500);
+            } else if (rand > 0.6) {
+              bot.setControlState('sneak', true);
+              setTimeout(() => bot.setControlState('sneak', false), 1000);
+            }
+
+            const moveType = Math.random() > 0.5 ? 'forward' : 'back';
+            bot.setControlState(moveType, true);
+            setTimeout(() => bot.setControlState(moveType, false), 300);
           }
-        }, 100);
+        }, 10000 + (Math.random() * 5000));
       });
 
       bot.on('spawn', () => {
-        io.emit('botLog', { id, msg: `[INFO] Bot spawned in the world.` });
+        io.emit('botLog', { id, msg: `[معلومة] البوت ظهر في العالم الآن.` });
+        // تأكيد إضافي للحالة عند الظهور
+        io.emit('botStatus', { id, status: 'online' });
       });
 
       bot.on('error', (err) => {
-        console.log(`[ERROR] ${username}: ${err.message}`);
-        io.emit('botLog', { id, msg: `[ERROR] ${err.message}` });
-        io.emit('botStatus', { id, status: 'offline', msg: `Error: ${err.message}` });
+        let errorMsg = `خطأ: ${err.message}`;
+        if (err.message.includes('ECONNREFUSED')) errorMsg = "تعذر الاتصال بالسيرفر (تأكد أنه شغال)";
+        
+        io.emit('botLog', { id, msg: `[خطأ] ${errorMsg}` });
+        io.emit('botStatus', { id, status: 'offline', msg: errorMsg });
         stopBot(id);
       });
 
       bot.on('kicked', (reason) => {
-        console.log(`[KICKED] ${username} from ${host}. Reason: ${reason}`);
-        io.emit('botLog', { id, msg: `[KICKED] ${reason}` });
-        io.emit('botStatus', { id, status: 'offline', msg: 'Kicked from server' });
+        const kickReason = typeof reason === 'string' ? reason : JSON.stringify(reason);
+        io.emit('botLog', { id, msg: `[طرد] تم طرد البوت: ${kickReason}` });
+        io.emit('botStatus', { id, status: 'offline', msg: 'تم الطرد من السيرفر' });
         
         if (activeBots[id]) {
             if (activeBots[id].afkInterval) clearInterval(activeBots[id].afkInterval);
@@ -218,22 +244,20 @@ function startBot(botData) {
         setTimeout(() => {
           const config = botsConfig.find(b => b.id === id);
           if (config && config.lastStatus === 'online') {
-              console.log(`[RETRY] Reconnecting ${username} after kick...`);
+              io.emit('botLog', { id, msg: `[إعادة محاولة] جاري محاولة الدخول مرة أخرى تلقائياً...` });
               startBot(config);
           }
         }, 5000);
       });
 
       bot.on('end', () => {
-        console.log(`[DISCONNECT] ${username} connection ended.`);
-        io.emit('botLog', { id, msg: `[SYS] Connection ended. Retrying in 5s...` });
-        io.emit('botStatus', { id, status: 'offline', msg: 'Disconnected' });
+        io.emit('botLog', { id, msg: `[انفصال] انقطع الاتصال. جاري إعادة المحاولة خلال 5 ثوانٍ...` });
+        io.emit('botStatus', { id, status: 'offline', msg: 'منقطع' });
         delete activeBots[id];
         
         setTimeout(() => {
           const config = botsConfig.find(b => b.id === id);
           if (config && config.lastStatus === 'online' && !activeBots[id]) {
-              console.log(`[RETRY] Reconnecting ${username}...`);
               startBot(config);
           }
         }, 5000);
@@ -241,7 +265,7 @@ function startBot(botData) {
     }
 
   } catch (err) {
-    io.emit('botLog', { id, msg: `[CRITICAL] ${err.message}` });
+    io.emit('botLog', { id, msg: `[خطأ حرج] ${err.message}` });
   }
 }
 
